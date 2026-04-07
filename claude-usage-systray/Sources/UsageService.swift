@@ -150,6 +150,8 @@ final class UsageService: ObservableObject {
                     sevenDaySonnetUtilization: sonnetUtil,
                     fiveHourResetIn: fiveHourReset.map { formatTimeRemaining(until: $0) },
                     sevenDayResetIn: sevenDayReset.map { formatTimeRemaining(until: $0) },
+                    fiveHourResetAt: fiveHourReset,
+                    sevenDayResetAt: sevenDayReset,
                     lastUpdated: Date(),
                     weeklySessions: 0,
                     weeklyMessages: 0,

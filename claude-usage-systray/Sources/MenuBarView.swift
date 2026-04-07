@@ -34,29 +34,45 @@ struct MenuBarView: View {
 
     private var usageHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Image(systemName: usageIconName)
-                    .foregroundColor(usageColor)
-                Text("5hr: \(usageService.currentUsage.fiveHourUtilization)%")
-                    .fontWeight(.medium)
-                Spacer()
-                if let timeLeft = usageService.currentUsage.fiveHourResetIn {
-                    Text(timeLeft)
-                        .font(.caption)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Image(systemName: usageIconName)
+                        .foregroundColor(usageColor)
+                    Text("5hr: \(usageService.currentUsage.fiveHourUtilization)%")
+                        .fontWeight(.medium)
+                    Spacer()
+                    if let timeLeft = usageService.currentUsage.fiveHourResetIn {
+                        Text(timeLeft)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                if let resetTime = UsageSnapshot.formatResetTime(usageService.currentUsage.fiveHourResetAt) {
+                    Text(resetTime)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
+                        .padding(.leading, 20)
                 }
             }
 
-            HStack {
-                Image(systemName: "calendar")
-                    .foregroundColor(weeklyColor)
-                Text("Week: \(usageService.currentUsage.sevenDayUtilization)%")
-                    .fontWeight(.medium)
-                Spacer()
-                if let timeLeft = usageService.currentUsage.sevenDayResetIn {
-                    Text(timeLeft)
-                        .font(.caption)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Image(systemName: "calendar")
+                        .foregroundColor(weeklyColor)
+                    Text("Week: \(usageService.currentUsage.sevenDayUtilization)%")
+                        .fontWeight(.medium)
+                    Spacer()
+                    if let timeLeft = usageService.currentUsage.sevenDayResetIn {
+                        Text(timeLeft)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                if let resetTime = UsageSnapshot.formatResetTime(usageService.currentUsage.sevenDayResetAt) {
+                    Text(resetTime)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
+                        .padding(.leading, 20)
                 }
             }
 
