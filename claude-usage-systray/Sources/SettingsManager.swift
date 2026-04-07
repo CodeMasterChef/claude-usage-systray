@@ -29,5 +29,6 @@ final class SettingsManager: ObservableObject {
     func setCriticalThreshold(_ value: Double) { settings.criticalThreshold = value }
     func setNotificationsEnabled(_ enabled: Bool) { settings.notificationsEnabled = enabled }
     func setCompactDisplay(_ enabled: Bool) { settings.compactDisplay = enabled }
+    func setRefreshInterval(_ seconds: Double) { settings.refreshIntervalSeconds = seconds }
     func resetToDefaults() { settings = AppSettings() }
 }

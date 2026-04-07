@@ -43,8 +43,8 @@ struct OAuthUsageResponse: Decodable {
     }
 
     struct UsagePeriod: Decodable {
-        let utilization: Double
-        let resetsAt: String
+        let utilization: Double?
+        let resetsAt: String?
 
         enum CodingKeys: String, CodingKey {
             case utilization
@@ -52,6 +52,7 @@ struct OAuthUsageResponse: Decodable {
         }
 
         var resetsAtDate: Date? {
+            guard let resetsAt else { return nil }
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             return formatter.date(from: resetsAt)
@@ -89,8 +90,10 @@ final class UsageService: ObservableObject {
     @Published private(set) var weeklyTokens: Int = 0
 
     private var refreshTimer: Timer?
-    private let normalInterval: TimeInterval = 5 * 60   // 5 minutes
-    private let backoffInterval: TimeInterval = 15 * 60 // 15 minutes after 429
+    private var normalInterval: TimeInterval {
+        SettingsManager.shared.settings.refreshIntervalSeconds
+    }
+    private var consecutiveErrors: Int = 0
 
     // Injectable for testing
     var urlSession: URLSession = .shared
@@ -133,7 +136,7 @@ final class UsageService: ObservableObject {
 
                 let fiveHourUtil = Int(response.fiveHour?.utilization ?? 0)
                 let sevenDayUtil = Int(response.sevenDay?.utilization ?? 0)
-                let sonnetUtil: Int? = response.sevenDaySonnet.map { Int($0.utilization) }
+                let sonnetUtil: Int? = response.sevenDaySonnet.flatMap { $0.utilization.map { Int($0) } }
 
                 let fiveHourReset = response.fiveHour?.resetsAtDate
                 let sevenDayReset = response.sevenDay?.resetsAtDate
@@ -154,23 +157,56 @@ final class UsageService: ObservableObject {
                     self.currentUsage = snapshot
                     self.error = nil
                     self.isLoading = false
+                    self.consecutiveErrors = 0
                     self.scheduleTimer(interval: self.normalInterval)
                 }
-            } catch let error as NSError {
-                let isRateLimit = error.code == 429
+            } catch {
+                let nsError = error as NSError
+                let httpCode = nsError.code
                 await MainActor.run {
-                    if isRateLimit {
-                        // Clear token so next attempt re-reads a potentially refreshed token from Keychain
-                        self.cachedToken = nil
-                        self.error = "Rate limited — retrying in 15 min"
-                        self.scheduleTimer(interval: self.backoffInterval)
+                    self.consecutiveErrors += 1
+                    // Always clear cached token so next attempt gets a fresh one
+                    self.cachedToken = nil
+
+                    let backoff = self.retryInterval()
+
+                    if httpCode == 429 {
+                        let mins = Int(backoff / 60)
+                        self.error = "Rate limited — retrying in \(mins) min"
+                    } else if httpCode == 401 || httpCode == 403 {
+                        self.error = "Auth error (\(httpCode)) — check Claude Code login"
+                    } else if let decodingError = error as? DecodingError {
+                        self.error = Self.describeDecodingError(decodingError)
                     } else {
                         self.error = error.localizedDescription
-                        self.scheduleTimer(interval: self.normalInterval)
                     }
+
                     self.isLoading = false
+                    self.scheduleTimer(interval: backoff)
                 }
             }
+        }
+    }
+
+    /// Progressive backoff: 1 min → 2 min → 5 min → 10 min → 15 min (cap)
+    private func retryInterval() -> TimeInterval {
+        let intervals: [TimeInterval] = [60, 120, 300, 600, 900]
+        let index = min(consecutiveErrors - 1, intervals.count - 1)
+        return intervals[max(0, index)]
+    }
+
+    private static func describeDecodingError(_ error: DecodingError) -> String {
+        switch error {
+        case .keyNotFound(let key, let context):
+            return "Missing key '\(key.stringValue)' at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+        case .typeMismatch(let type, let context):
+            return "Type mismatch for \(type) at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+        case .valueNotFound(let type, let context):
+            return "Null value for \(type) at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+        case .dataCorrupted(let context):
+            return "Corrupted data at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+        @unknown default:
+            return error.localizedDescription
         }
     }
 
@@ -195,6 +231,11 @@ final class UsageService: ObservableObject {
                           userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(body)"])
         }
 
-        return try JSONDecoder().decode(OAuthUsageResponse.self, from: data)
+        do {
+            return try JSONDecoder().decode(OAuthUsageResponse.self, from: data)
+        } catch let decodingError as DecodingError {
+            print("[UsageService] Decoding error: \(decodingError)")
+            throw decodingError
+        }
     }
 }

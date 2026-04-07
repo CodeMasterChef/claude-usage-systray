@@ -81,9 +81,9 @@ final class OAuthUsageResponseTests: XCTestCase {
         let response = try JSONDecoder().decode(OAuthUsageResponse.self, from: json)
 
         // Int() truncates (floors), matching how snapshot builds utilization
-        XCTAssertEqual(Int(response.fiveHour!.utilization), 34)
-        XCTAssertEqual(Int(response.sevenDay!.utilization), 71)
-        XCTAssertEqual(Int(response.sevenDaySonnet!.utilization), 26)
+        XCTAssertEqual(Int(response.fiveHour!.utilization!), 34)
+        XCTAssertEqual(Int(response.sevenDay!.utilization!), 71)
+        XCTAssertEqual(Int(response.sevenDaySonnet!.utilization!), 26)
     }
 }
 

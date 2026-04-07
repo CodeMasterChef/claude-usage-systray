@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var criticalThreshold: Double = 90
     @State private var notificationsEnabled: Bool = true
     @State private var compactDisplay: Bool = true
+    @State private var refreshInterval: Double = 60
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +39,17 @@ struct SettingsView: View {
                         .onChange(of: compactDisplay) { newValue in
                             settingsManager.setCompactDisplay(newValue)
                         }
+
+                    VStack(alignment: .leading) {
+                        Text("Refresh interval: \(Int(refreshInterval))s")
+                        Slider(value: $refreshInterval, in: 30...300, step: 10)
+                            .onChange(of: refreshInterval) { newValue in
+                                settingsManager.setRefreshInterval(newValue)
+                            }
+                        Text("How often to fetch usage data (30–300 seconds)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Section("Notifications") {
@@ -68,7 +80,7 @@ struct SettingsView: View {
 
             footer
         }
-        .frame(width: 360, height: 390)
+        .frame(width: 360, height: 470)
         .onAppear { loadSettings() }
     }
 
@@ -110,6 +122,7 @@ struct SettingsView: View {
         criticalThreshold = settingsManager.settings.criticalThreshold
         notificationsEnabled = settingsManager.settings.notificationsEnabled
         compactDisplay = settingsManager.settings.compactDisplay
+        refreshInterval = settingsManager.settings.refreshIntervalSeconds
     }
 
     private func resetToDefaults() {
