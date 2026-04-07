@@ -5,7 +5,7 @@ struct AppSettings: Codable {
     var criticalThreshold: Double = 90.0
     var notificationsEnabled: Bool = true
     var compactDisplay: Bool = true
-    var refreshIntervalSeconds: Double = 60
+    var refreshIntervalSeconds: Double = 120
 
     var isConfigured: Bool { true }
 }

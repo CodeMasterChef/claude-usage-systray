@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var notificationsEnabled: Bool = true
     @State private var compactDisplay: Bool = true
     @State private var refreshInterval: Double = 60
+    @State private var launchAtLogin: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +35,13 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("General") {
+                    Toggle("Launch at login", isOn: $launchAtLogin)
+                        .onChange(of: launchAtLogin) { newValue in
+                            settingsManager.launchAtLogin = newValue
+                        }
+                }
+
                 Section("Menu Bar") {
                     Toggle("Compact display (5h · 7d)", isOn: $compactDisplay)
                         .onChange(of: compactDisplay) { newValue in
@@ -42,11 +50,11 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading) {
                         Text("Refresh interval: \(Int(refreshInterval))s")
-                        Slider(value: $refreshInterval, in: 30...300, step: 10)
+                        Slider(value: $refreshInterval, in: 60...600, step: 30)
                             .onChange(of: refreshInterval) { newValue in
                                 settingsManager.setRefreshInterval(newValue)
                             }
-                        Text("How often to fetch usage data (30–300 seconds)")
+                        Text("How often to fetch usage data (60–600 seconds)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -80,7 +88,7 @@ struct SettingsView: View {
 
             footer
         }
-        .frame(width: 360, height: 470)
+        .frame(width: 360, height: 530)
         .onAppear { loadSettings() }
     }
 
@@ -123,6 +131,7 @@ struct SettingsView: View {
         notificationsEnabled = settingsManager.settings.notificationsEnabled
         compactDisplay = settingsManager.settings.compactDisplay
         refreshInterval = settingsManager.settings.refreshIntervalSeconds
+        launchAtLogin = settingsManager.launchAtLogin
     }
 
     private func resetToDefaults() {

@@ -1,7 +1,24 @@
 import Foundation
+import ServiceManagement
 
 final class SettingsManager: ObservableObject {
     static let shared = SettingsManager()
+
+    var launchAtLogin: Bool {
+        get { SMAppService.mainApp.status == .enabled }
+        set {
+            do {
+                if newValue {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+                objectWillChange.send()
+            } catch {
+                print("[SettingsManager] Launch at login error: \(error)")
+            }
+        }
+    }
 
     @Published var settings: AppSettings {
         didSet { saveSettings() }

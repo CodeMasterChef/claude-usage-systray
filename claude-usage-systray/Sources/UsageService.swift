@@ -121,7 +121,10 @@ final class UsageService: ObservableObject {
 
     private func scheduleTimer(interval: TimeInterval) {
         refreshTimer?.invalidate()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+        // Add ±10% jitter to avoid predictable polling patterns
+        let jitter = interval * Double.random(in: -0.1...0.1)
+        let actual = max(30, interval + jitter)
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: actual, repeats: false) { [weak self] _ in
             self?.fetchUsage()
         }
     }
@@ -165,14 +168,19 @@ final class UsageService: ObservableObject {
                 let httpCode = nsError.code
                 await MainActor.run {
                     self.consecutiveErrors += 1
-                    // Always clear cached token so next attempt gets a fresh one
-                    self.cachedToken = nil
+                    // Only clear cached token on auth errors so Keychain isn't re-read unnecessarily
+                    if httpCode == 401 || httpCode == 403 {
+                        self.cachedToken = nil
+                    }
 
-                    let backoff = self.retryInterval()
+                    // Use Retry-After header if available, otherwise progressive backoff
+                    let retryAfter = (nsError.userInfo["RetryAfter"] as? Double) ?? 0
+                    let backoff = retryAfter > 0 ? max(retryAfter, 30) : self.retryInterval()
 
                     if httpCode == 429 {
-                        let mins = Int(backoff / 60)
-                        self.error = "Rate limited — retrying in \(mins) min"
+                        let secs = Int(backoff)
+                        let display = secs >= 60 ? "\(secs / 60) min" : "\(secs)s"
+                        self.error = "Rate limited — retrying in \(display)"
                     } else if httpCode == 401 || httpCode == 403 {
                         self.error = "Auth error (\(httpCode)) — check Claude Code login"
                     } else if let decodingError = error as? DecodingError {
@@ -214,6 +222,7 @@ final class UsageService: ObservableObject {
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
+        request.setValue("claude-code/2.1.92", forHTTPHeaderField: "User-Agent")
 
         print("[UsageService] GET /api/oauth/usage")
 
@@ -227,8 +236,12 @@ final class UsageService: ObservableObject {
         print("[UsageService] HTTP \(http.statusCode) — \(body.prefix(300))")
 
         guard http.statusCode == 200 else {
-            throw NSError(domain: "OAuthUsage", code: http.statusCode,
-                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(body)"])
+            var info: [String: Any] = [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(body)"]
+            if let retryAfter = http.value(forHTTPHeaderField: "Retry-After"),
+               let seconds = Double(retryAfter) {
+                info["RetryAfter"] = seconds
+            }
+            throw NSError(domain: "OAuthUsage", code: http.statusCode, userInfo: info)
         }
 
         do {

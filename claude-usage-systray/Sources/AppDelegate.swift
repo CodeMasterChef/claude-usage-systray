@@ -142,6 +142,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             str.append(NSAttributedString(string: "\(sevenD)%",
                 attributes: [.font: font, .foregroundColor: usageColor(for: sevenD)]))
 
+            if let resetIn = snapshot.fiveHourResetIn {
+                str.append(NSAttributedString(string: " · ",
+                    attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
+                str.append(NSAttributedString(string: resetIn,
+                    attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
+            }
+
             button.image = nil
             button.attributedTitle = str
         } else {
